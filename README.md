@@ -10,6 +10,9 @@ After collecting URLs from these sources, Foxy scans and filters for:
 - 🔑 API keys, tokens, secrets, credentials in query strings or paths
 
 ## 🚀 Example Use Case
+
 ```bash
-python3 foxy.py -d example.com
-python3 foxy.py -w example.com
+# Investigate a single domain
+python3 najnovsi.py -d example.com
+# Investigate a domain and its subdomains (wildcard search)
+python3 najnovsi.py -w example.com
