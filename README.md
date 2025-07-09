@@ -1,6 +1,3 @@
-# Foxy
+# 🦊 Foxy - OSINT-based Sensitive Path & Secret Finder
 
-## Droje:
-- https://www.youtube.com/watch?v=5RyODeBjar4&t=2409s
-- https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/waymore.py
-- https://www.youtube.com/watch?v=Xosa-1o-01M
+**Foxy** is an automated OSINT (Open Source Intelligence) tool that collects historical and passive web data from multiple public sources. It identifies potentially sensitive paths, directories, backup files, and exposed keys or secrets. This makes it especially useful for reconnaissance during security assessments and bug bounty hunting.
