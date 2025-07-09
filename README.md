@@ -26,7 +26,7 @@ Foxy searches for URL paths that may lead to administrative panels, dev environm
 - `/admin`, `/dashboard`, `/login`, `/register`, `/api`
 - `/config`, `/backup`, `/private`, `/uploads`, `/downloads`
 - `/.git/`, `/.svn/`, `/.env`, `/docker-compose.yml`
-- `/wp-admin`, `/phpmyadmin`
+- `/wp-admin`, `/phpmyadmin`, 
 
 These paths are commonly overlooked and may expose internal functionality or sensitive resources.
 
