@@ -8,3 +8,8 @@ After collecting URLs from these sources, Foxy scans and filters for:
 - 📁 Sensitive paths (e.g. `/admin`, `/internal`, `/config`, `/login`...)
 - 📦 Backup or archive files (e.g. `.zip`, `.tar.gz`, `.bak`, `.old`...)
 - 🔑 API keys, tokens, secrets, credentials in query strings or paths
+
+## 🚀 Example Use Case
+```bash
+python3 foxy.py -d example.com
+python3 foxy.py -w example.com
