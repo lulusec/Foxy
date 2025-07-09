@@ -5,10 +5,7 @@ import re
 import argparse
 import random
 from urllib.parse import unquote
-
-# --- CONFIGURATION ---
-# Place your VirusTotal API key here.
-VIRUSTOTAL_API_KEY = "YOUR_VIRUSTOTAL_API_KEY_HERE" 
+import os
 
 # Terminal colors
 class COLORS:
@@ -34,20 +31,27 @@ USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12H321 Safari/600.1.4",
 ]
 
-# URL templates
-WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}/*&output=json&fl=original&collapse=urlkey'
+# <<< ZMENA: Dve URL šablóny pre Wayback Machine
+WAYBACK_DOMAIN_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}/*&output=json&fl=original&collapse=urlkey'
+WAYBACK_WILDCARD_URL = 'https://web.archive.org/cdx/search/cdx?url=*.{DOMAIN}/*&output=json&fl=original&collapse=urlkey'
+
+# Ostatné URL šablóny
 CCRAWL_INDEX_URL = 'http://index.commoncrawl.org/CC-MAIN-2023-50-index?url={DOMAIN}/*&output=json'
 ALIENVAULT_URL = 'https://otx.alienvault.com/api/v1/indicators/domain/{DOMAIN}/url_list?limit=1000'
 URLSCAN_URL = 'https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}&size=10000'
-VIRUSTOTAL_URL = 'https://www.virustotal.com/api/v3/domains/{DOMAIN}/urls?limit=40'
 
 # --- PATTERNS FOR SEARCHING (REGULAR EXPRESSIONS) ---
 PATTERNS = {
-    # --- THIS LINE HAS BEEN UPDATED ---
     "Backup Files": re.compile(r'\.(bak|sql|zip|rar|7z|tar\.gz|tgz|ddl|iso|jar|old|backup|config|yml|yaml|json|log|txt|csv|mdb|db|sqlite|env(\.local)?)$', re.IGNORECASE),
     "Sensitive Paths and Directories": re.compile(r'/(admin|dashboard|login|register|api|config|backup|private|uploads|downloads|\.git|\.svn|\.env|docker-compose\.yml|wp-admin|phpmyadmin)/', re.IGNORECASE),
     "Keys and Tokens in URL": re.compile(r'[\?&](token|key|apikey|password|secret|auth|session|access_token|jwt)=[^&]+', re.IGNORECASE)
 }
+
+# Regulárny výraz na vylúčenie bežných súborov
+EXCLUSION_PATTERN = re.compile(
+    r'\.(css|js|jpe?g|png|svg|gif|webp|scss|tif|tiff|otf|woff|woff2|flv|ogv|ico|img)(\?.*)?$', 
+    re.IGNORECASE
+)
 
 
 async def fetch_urls(session, url, source_name):
@@ -58,12 +62,6 @@ async def fetch_urls(session, url, source_name):
         headers = {
             'User-Agent': random.choice(USER_AGENTS)
         }
-        
-        if source_name == "VirusTotal":
-            if not VIRUSTOTAL_API_KEY or VIRUSTOTAL_API_KEY == "YOUR_VIRUSTOTAL_API_KEY_HERE":
-                print(f"{COLORS.YELLOW}[WARNING]{COLORS.ENDC} VirusTotal API key is missing. Skipping this source.")
-                return set()
-            headers['x-apikey'] = VIRUSTOTAL_API_KEY
         
         async with session.get(url, headers=headers, timeout=30) as response:
             if response.status == 200:
@@ -87,9 +85,6 @@ async def fetch_urls(session, url, source_name):
                     for result in data.get('results', []):
                         urls.add(unquote(result.get('page', {}).get('url')))
                         urls.add(unquote(result.get('task', {}).get('url')))
-                elif source_name == "VirusTotal":
-                    data = await response.json()
-                    for item in data.get('data', []): urls.add(unquote(item.get('attributes', {}).get('url')))
                 
                 print(f"{COLORS.BLUE}[INFO]{COLORS.ENDC} {source_name} found {len(urls)} unique URLs.")
                 return urls
@@ -103,11 +98,10 @@ async def fetch_urls(session, url, source_name):
         print(f"{COLORS.RED}[ERROR]{COLORS.ENDC} Connection issue with {source_name}: {e}")
         return set()
 
-def analyze_urls(all_urls):
+def analyze_urls(urls_to_analyze):
     """Analyzes a list of URLs for defined patterns."""
-    print(f"\n{COLORS.BLUE}[INFO]{COLORS.ENDC} Analyzing {len(all_urls)} collected URLs...")
     findings = {key: set() for key in PATTERNS.keys()}
-    for url in all_urls:
+    for url in urls_to_analyze:
         if not url: continue
         decoded_url = unquote(url)
         for category, pattern in PATTERNS.items():
@@ -115,14 +109,17 @@ def analyze_urls(all_urls):
                 findings[category].add(decoded_url)
     return findings
 
-def generate_report(domain, findings, total_urls_count):
+def generate_report(domain, findings, total_urls_analyzed):
     """Generates a summary to the console and a detailed report to a file."""
-    report_filename = f"report-{domain}.txt"
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    report_filename = os.path.join(output_dir, f"report-{domain}.txt")
     
     print("\n" + "="*50)
     print(f" SUMMARY REPORT FOR DOMAIN: {domain}")
     print("="*50)
-    print(f"Total unique URLs analyzed: {total_urls_count}\n")
+    print(f"Total unique URLs analyzed (after filtering): {total_urls_analyzed}\n")
     
     has_findings = False
     for category, urls in findings.items():
@@ -142,7 +139,7 @@ def generate_report(domain, findings, total_urls_count):
 
     with open(report_filename, "w", encoding="utf-8") as f:
         f.write(f"FINAL REPORT FOR DOMAIN: {domain}\n")
-        f.write(f"Total unique URLs analyzed: {total_urls_count}\n\n")
+        f.write(f"Total unique URLs analyzed (after filtering): {total_urls_analyzed}\n\n")
 
         if not has_findings:
             f.write("No sensitive information found based on the defined patterns.\n")
@@ -150,24 +147,30 @@ def generate_report(domain, findings, total_urls_count):
             for category, urls in findings.items():
                 if urls:
                     title = f"--- FINDINGS: {category} ({len(urls)}) ---"
-                    print(f"\n{COLORS.YELLOW}{title}{COLORS.ENDC}")
                     f.write(f"{title}\n")
                     for url in sorted(list(urls)):
-                        print(f"  [+] {url}")
                         f.write(f"  [+] {url}\n")
                     f.write("\n")
 
     print(f"\n{COLORS.BLUE}[INFO]{COLORS.ENDC} Full report has been saved to file: {report_filename}")
 
-async def main(domain):
+# <<< ZMENA: Funkcia main teraz prijíma aj parameter is_wildcard
+async def main(domain, is_wildcard):
     """The main function that orchestrates the entire process."""
+    
+    # <<< ZMENA: Výber správnej URL pre Wayback Machine na základe voľby
+    if is_wildcard:
+        wayback_url = WAYBACK_WILDCARD_URL.format(DOMAIN=domain)
+        print(f"{COLORS.BLUE}[INFO]{COLORS.ENDC} Wildcard search enabled for Wayback Machine (*.{domain})")
+    else:
+        wayback_url = WAYBACK_DOMAIN_URL.format(DOMAIN=domain)
+
     async with aiohttp.ClientSession() as session:
         tasks = [
-            fetch_urls(session, WAYBACK_URL.format(DOMAIN=domain), "Wayback Machine"),
+            fetch_urls(session, wayback_url, "Wayback Machine"),
             fetch_urls(session, CCRAWL_INDEX_URL.format(DOMAIN=domain), "Common Crawl"),
             fetch_urls(session, ALIENVAULT_URL.format(DOMAIN=domain), "AlienVault"),
             fetch_urls(session, URLSCAN_URL.format(DOMAIN=domain), "URLScan"),
-            fetch_urls(session, VIRUSTOTAL_URL.format(DOMAIN=domain), "VirusTotal"),
         ]
         results = await asyncio.gather(*tasks)
         
@@ -177,12 +180,35 @@ async def main(domain):
             print(f"\n{COLORS.RED}[ERROR]{COLORS.ENDC} Failed to fetch any URLs. The script is terminating.")
             return
 
-        findings = analyze_urls(all_urls)
-        generate_report(domain, findings, len(all_urls))
+        initial_count = len(all_urls)
+        print(f"\n{COLORS.BLUE}[INFO]{COLORS.ENDC} Collected {initial_count} total unique URLs.")
+        
+        filtered_urls = {url for url in all_urls if url and not EXCLUSION_PATTERN.search(url)}
+        
+        excluded_count = initial_count - len(filtered_urls)
+        print(f"{COLORS.BLUE}[INFO]{COLORS.ENDC} Filtering out common asset files... Excluded {excluded_count} URLs.")
+        
+        print(f"{COLORS.BLUE}[INFO]{COLORS.ENDC} Analyzing {len(filtered_urls)} remaining URLs...")
+
+        findings = analyze_urls(filtered_urls)
+        generate_report(domain, findings, len(filtered_urls))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="A tool to find sensitive files and information from online sources.")
-    parser.add_argument("domain", help="The domain to investigate (e.g., example.com)")
+    
+    # <<< ZMENA: Vytvorenie vzájomne sa vylučujúcej skupiny argumentov
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-d", "--domain", help="The domain to investigate (e.g., example.com)")
+    group.add_argument("-w", "--wildcard", help="The domain to investigate with subdomains (e.g., example.com for *.example.com search)")
+    
     args = parser.parse_args()
     
-    asyncio.run(main(args.domain))
+    # <<< ZMENA: Zistenie, ktorý argument bol použitý, a nastavenie premenných
+    if args.domain:
+        target_domain = args.domain
+        is_wildcard_search = False
+    else: # Musí to byť args.wildcard, keďže skupina je povinná
+        target_domain = args.wildcard
+        is_wildcard_search = True
+        
+    asyncio.run(main(target_domain, is_wildcard_search))
