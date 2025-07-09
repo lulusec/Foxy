@@ -14,6 +14,6 @@ python foxy.py -w example.com
 
 ## 🧠 What Foxy Looks For
 Foxy scans collected URLs using pattern matching to detect potential risks. It focuses on three primary categories:
-#### 🗃️ Backup & Configuration Files
-#### 📁 Sensitive Paths and Directories
-#### 🔑 Keys and Tokens in URLs
+  - #### 🗃️ Backup & Configuration Files
+  - #### 📁 Sensitive Paths and Directories
+  - #### 🔑 Keys and Tokens in URLs
