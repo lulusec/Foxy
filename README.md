@@ -3,12 +3,12 @@
 
 
 ## 🚀 Example Use Case
+#### Investigate a single domain
 ```
-# Investigate a single domain
 python foxy.py -d example.com
 ```
+#### Investigate a subdomains (wildcard search)
 ```
-# Investigate a subdomains (wildcard search)
 python foxy.py -w example.com
 ```
 
