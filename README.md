@@ -3,13 +3,13 @@
 
 
 ## 🚀 Example Use Case
-```bash
+```
 # Investigate a single domain
 python foxy.py -d example.com
 
 # Investigate a subdomains (wildcard search)
 python foxy.py -w example.com
-
+```
 
 ## 🧠 What Foxy Looks For
 Foxy scans collected URLs using pattern matching to detect potential risks. It focuses on three primary categories:
